@@ -6,13 +6,17 @@ package ytdlp
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
+	"runtime"
 
 	"github.com/tiagomelo/ytdld/syscall"
+	"github.com/tiagomelo/ytdld/ytdlp/fp"
+	"github.com/tiagomelo/ytdld/ytdlp/os"
 )
 
-// ytDlpToolName is the name of the yt-dlp executable for macOS.
-const ytDlpToolName = "bin/yt-dlp_macos"
+//go:embed yt-dlp_macos
+var ytDlpMacOS []byte // ytDlpMacOS is the embedded yt-dlp executable for macOS.
 
 // osCommandExecutor defines an interface for executing OS commands.
 type osCommandExecutor interface {
@@ -27,17 +31,31 @@ func (d *defaultOSCommandExecutor) ExecCommand(ctx context.Context, name string,
 	return syscall.ExecCommand(ctx, name, arg...)
 }
 
+// osOperationsProvider is a variable that holds the OS operations provider.
+var osOperationsProvider os.OSOperations = &os.OSOperationsProvider{}
+
+// osName holds the name of the operating system.
+var osName = runtime.GOOS
+
 // osCommandExecutorProvider is a variable that holds the function
 // that executes a command with arguments.
 var osCommandExecutorProvider osCommandExecutor = &defaultOSCommandExecutor{}
 
+// filePathOperationsProvider is a variable that holds the file path operations provider.
+var filePathOperationsProvider fp.FilePathOperations = fp.FilePathOperationsProvider{}
+
 // DownloadVideo downloads a video from the given URL using yt-dlp.
 // Only macOS is supported at the moment.
 func DownloadVideo(ctx context.Context, url, outputPath string) (string, error) {
+	tool, err := ytDlpPath()
+	if err != nil {
+		return "", err
+	}
+
 	outputPath = fmt.Sprintf("%s.%%(ext)s", outputPath)
 	if _, err := osCommandExecutorProvider.ExecCommand(
 		ctx,
-		ytDlpToolName,
+		tool,
 		"-o",
 		outputPath,
 		url,
@@ -45,4 +63,23 @@ func DownloadVideo(ctx context.Context, url, outputPath string) (string, error) 
 		return "", err
 	}
 	return outputPath, nil
+}
+
+// ytDlpPath returns the path to the yt-dlp executable for macOS.
+func ytDlpPath() (string, error) {
+	const darwinOS = "darwin"
+
+	if osName != darwinOS {
+		return "", fmt.Errorf("unsupported OS: %s", osName)
+	}
+	dir, err := osOperationsProvider.MkdirTemp("", "ytdld-*")
+	if err != nil {
+		return "", err
+	}
+	p := filePathOperationsProvider.Join(dir, "yt-dlp_macos")
+	if err := osOperationsProvider.WriteFile(p, ytDlpMacOS, 0o755); err != nil {
+		_ = osOperationsProvider.RemoveAll(dir)
+		return "", err
+	}
+	return p, nil
 }
