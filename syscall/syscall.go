@@ -16,9 +16,9 @@ var fsProvider fs.FileSystem = fs.OSFileSystem{}
 
 // ExecCommand executes a command with arguments.
 func ExecCommand(ctx context.Context, cmd string, args ...string) (string, error) {
-	output, err := fsProvider.CommandContext(ctx, cmd, args...).CombinedOutput()
+	output, err := fsProvider.CommandContext(ctx, cmd, args...)
 	if err != nil {
-		return "", errors.WithMessagef(err, "error when executing command [%s] with args %v: output: [%v]", cmd, args, string(output))
+		return "", errors.WithMessagef(err, "error when executing command [%s] with args %v: stdout: [%v] stderr: [%v]", cmd, args, output.Stdout, output.Stderr)
 	}
-	return string(output), nil
+	return output.Stdout, nil
 }

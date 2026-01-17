@@ -5,21 +5,21 @@
 package fs
 
 import (
+	"bytes"
 	"context"
 	"os/exec"
 )
 
-// ExecCmd interface abstracts the command execution.
-type ExecCmd interface {
-	// CombinedOutput runs the command and returns its
-	// combined standard output and standard error.
-	CombinedOutput() ([]byte, error)
+// ExecCmdOutput struct holds the output of an executed command.
+type ExecCmdOutput struct {
+	Stdout string // Stdout is the standard output of the command.
+	Stderr string // Stderr is the standard error output of the command.
 }
 
 // FileSystem interface abstracts the file system operations.
 type FileSystem interface {
 	// CommandContext creates a new execCmd for the given command.
-	CommandContext(ctx context.Context, name string, arg ...string) ExecCmd
+	CommandContext(ctx context.Context, name string, arg ...string) (ExecCmdOutput, error)
 }
 
 // OSFileSystem struct implements the fileSystem interface using
@@ -27,6 +27,18 @@ type FileSystem interface {
 // that interacts with the actual file system.
 type OSFileSystem struct{}
 
-func (OSFileSystem) CommandContext(ctx context.Context, name string, arg ...string) ExecCmd {
-	return exec.CommandContext(ctx, name, arg...)
+// CommandContext creates a new execCmd for the given command.
+func (OSFileSystem) CommandContext(ctx context.Context, name string, arg ...string) (ExecCmdOutput, error) {
+	c := exec.CommandContext(ctx, name, arg...)
+
+	var outBuf, errBuf bytes.Buffer
+	c.Stdout = &outBuf
+	c.Stderr = &errBuf
+
+	err := c.Run()
+
+	return ExecCmdOutput{
+		Stdout: outBuf.String(),
+		Stderr: errBuf.String(),
+	}, err
 }

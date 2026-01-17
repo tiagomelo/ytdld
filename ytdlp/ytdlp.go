@@ -9,6 +9,7 @@ import (
 	_ "embed"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/tiagomelo/ytdld/syscall"
 	"github.com/tiagomelo/ytdld/ytdlp/fp"
@@ -52,17 +53,26 @@ func DownloadVideo(ctx context.Context, url, outputPath string) (string, error) 
 		return "", err
 	}
 
-	outputPath = fmt.Sprintf("%s.%%(ext)s", outputPath)
-	if _, err := osCommandExecutorProvider.ExecCommand(
+	template := fmt.Sprintf("%s.%%(ext)s", outputPath)
+	out, err := osCommandExecutorProvider.ExecCommand(
 		ctx,
 		tool,
-		"-o",
-		outputPath,
+		"-o", template,
+		"--print", "after_move:filepath",
+		"--no-progress",
 		url,
-	); err != nil {
+	)
+	if err != nil {
 		return "", err
 	}
-	return outputPath, nil
+
+	// yt-dlp prints the path with a trailing newline
+	finalPath := strings.TrimSpace(out)
+	if finalPath == "" {
+		return "", fmt.Errorf("yt-dlp did not return final file path")
+	}
+
+	return finalPath, nil
 }
 
 // ytDlpPath returns the path to the yt-dlp executable for macOS.

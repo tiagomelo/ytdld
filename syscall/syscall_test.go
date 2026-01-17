@@ -19,12 +19,12 @@ func TestExecCommand(t *testing.T) {
 		defer func() {
 			fsProvider = originalFSProvider
 		}()
-		mockCmd := &mockExecCmd{
-			output: []byte("command output"),
-			err:    nil,
+		mockCmdOutput := fs.ExecCmdOutput{
+			Stdout: "command output",
+			Stderr: "",
 		}
 		fsProvider = &mockOSFileSystem{
-			execCmd: mockCmd,
+			execCmdOutput: mockCmdOutput,
 		}
 		output, err := ExecCommand(context.TODO(), "echo", "hello")
 		require.NotNil(t, output)
@@ -35,32 +35,25 @@ func TestExecCommand(t *testing.T) {
 		defer func() {
 			fsProvider = originalFSProvider
 		}()
-		mockCmd := &mockExecCmd{
-			output: nil,
-			err:    exec.ErrNotFound,
+		mockCmdOutput := fs.ExecCmdOutput{
+			Stdout: "",
+			Stderr: "",
 		}
 		fsProvider = &mockOSFileSystem{
-			execCmd: mockCmd,
+			execCmdOutput:     mockCmdOutput,
+			errCommandContext: exec.ErrNotFound,
 		}
 		output, err := ExecCommand(context.TODO(), "some-nonexistent-command", "arg1")
 		require.Empty(t, output)
-		require.Equal(t, `error when executing command [some-nonexistent-command] with args [arg1]: output: []: executable file not found in $PATH`, err.Error())
+		require.Equal(t, `error when executing command [some-nonexistent-command] with args [arg1]: stdout: [] stderr: []: executable file not found in $PATH`, err.Error())
 	})
 }
 
-type mockExecCmd struct {
-	output []byte
-	err    error
-}
-
-func (m *mockExecCmd) CombinedOutput() ([]byte, error) {
-	return m.output, m.err
-}
-
 type mockOSFileSystem struct {
-	execCmd *mockExecCmd
+	execCmdOutput     fs.ExecCmdOutput
+	errCommandContext error
 }
 
-func (m *mockOSFileSystem) CommandContext(ctx context.Context, name string, arg ...string) fs.ExecCmd {
-	return m.execCmd
+func (m *mockOSFileSystem) CommandContext(ctx context.Context, name string, arg ...string) (fs.ExecCmdOutput, error) {
+	return m.execCmdOutput, m.errCommandContext
 }

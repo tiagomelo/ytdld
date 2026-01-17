@@ -16,7 +16,9 @@ func TestDownloadVideo(t *testing.T) {
 		defer func() {
 			osCommandExecutorProvider = originalExecutor
 		}()
-		osCommandExecutorProvider = &mockOSCommandExecutor{}
+		osCommandExecutorProvider = &mockOSCommandExecutor{
+			execCommandOutput: "Download successful",
+		}
 
 		_, err := DownloadVideo(context.Background(), "https://example.com/video", "/path/to/output")
 		require.NoError(t, err)
@@ -102,11 +104,12 @@ func Test_ytDlpPath(t *testing.T) {
 }
 
 type mockOSCommandExecutor struct {
-	execCommandErr error
+	execCommandOutput string
+	execCommandErr    error
 }
 
 func (m *mockOSCommandExecutor) ExecCommand(ctx context.Context, name string, arg ...string) (string, error) {
-	return "", m.execCommandErr
+	return m.execCommandOutput, m.execCommandErr
 }
 
 type mockOsOperationsProvider struct {
